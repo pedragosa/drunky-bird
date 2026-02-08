@@ -399,8 +399,10 @@
         if (e.code === "Space") input();
     });
 
-    document.addEventListener("mousedown", input);
-    document.addEventListener("touchstart", input);
+    document.addEventListener("pointerdown", e => {
+        e.preventDefault();
+        input();
+    }, { passive: false });
 
     startBtn.addEventListener("click", e => {
         e.preventDefault();
