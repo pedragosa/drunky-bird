@@ -1,0 +1,732 @@
+﻿@page
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Drunky Bird</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            background: linear-gradient(#4fc3f7, #b3e5fc);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        canvas {
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+        }
+
+        .menu-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(2px);
+            z-index: 10;
+        }
+
+        .menu-card {
+            background: white;
+            padding: 50px 70px;
+            border-radius: 16px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+            text-align: center;
+            position: relative;
+            min-width: 280px;
+        }
+
+        .menu-card h1 {
+            margin-bottom: 20px;
+            font-size: 46px;
+            color: #333;
+        }
+
+        .bird {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 24px;
+            animation: float 1.2s ease-in-out infinite;
+        }
+
+        .bird svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        @@keyframes float {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
+            100% { transform: translateY(0); }
+        }
+
+        .start-btn {
+            display: inline-block;
+            padding: 16px 50px;
+            font-size: 22px;
+            color: white;
+            background: #4caf50;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.1s ease;
+        }
+
+        .start-btn:hover {
+            background: #43a047;
+            transform: translateY(-2px);
+        }
+
+        .start-btn:active {
+            transform: translateY(0);
+        }
+
+        .hint {
+            margin-top: 18px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .fullscreen-btn {
+            margin-top: 12px;
+            font-size: 13px;
+            color: #555;
+            background: none;
+            border: none;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .exit-fullscreen {
+            position: fixed;
+            top: 16px;
+            right: 18px;
+            z-index: 30;
+            padding: 8px 12px;
+            font-size: 12px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(0, 0, 0, 0.55);
+            color: white;
+            cursor: pointer;
+            display: none;
+        }
+
+        .music-btn {
+            position: fixed;
+            top: 16px;
+            left: 18px;
+            z-index: 30;
+            padding: 8px 12px;
+            font-size: 12px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(0, 0, 0, 0.55);
+            color: white;
+            cursor: pointer;
+        }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(2px);
+            z-index: 20;
+        }
+
+        .modal {
+            background: #ffffff;
+            padding: 22px 26px;
+            border-radius: 14px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+            text-align: center;
+            min-width: 260px;
+        }
+
+        .modal h2 {
+            margin: 0 0 12px;
+            font-size: 22px;
+        }
+
+        .modal p {
+            margin: 0 0 16px;
+            color: #444;
+        }
+
+        .modal .actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .modal button {
+            border: none;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-retry {
+            background: #43a047;
+            color: white;
+        }
+
+        .btn-menu {
+            background: #eeeeee;
+            color: #222;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="game" width="420" height="640"></canvas>
+<audio id="bgm" src="/audio/bgm.mp3" loop preload="auto"></audio>
+<audio id="deathSfx" src="/audio/death.mp3" preload="auto"></audio>
+<audio id="pointSfx" src="/audio/pipe.mp3" preload="auto"></audio>
+
+<div id="menuOverlay" class="menu-overlay" aria-hidden="false">
+    <div class="menu-card">
+        <h1>Drunky Bird</h1>
+
+        <div class="bird" aria-hidden="true">
+            <svg viewBox="0 0 64 64" role="img" aria-label="Bird">
+                <defs>
+                    <radialGradient id="bodyGrad" cx="40%" cy="35%" r="60%">
+                        <stop offset="0%" stop-color="#fff59d" />
+                        <stop offset="60%" stop-color="#ffeb3b" />
+                        <stop offset="100%" stop-color="#f9a825" />
+                    </radialGradient>
+                </defs>
+                <circle cx="32" cy="32" r="18" fill="url(#bodyGrad)" />
+                <circle cx="26" cy="36" r="8" fill="#fbc02d" />
+                <circle cx="38" cy="28" r="4.6" fill="#ffffff" />
+                <circle cx="40.5" cy="27.5" r="2" fill="#222222" />
+                <polygon points="47,31 58,34 47,38" fill="#ff9800" />
+                <circle cx="32" cy="32" r="18" fill="none" stroke="rgba(0,0,0,0.12)" stroke-width="1.2" />
+            </svg>
+        </div>
+
+        <button id="startBtn" class="start-btn">Start</button>
+
+        <div class="hint">Press SPACE or tap to play</div>
+
+        <button id="fullscreenBtn" class="fullscreen-btn">Fullscreen</button>
+    </div>
+</div>
+
+<div id="gameoverOverlay" class="overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-labelledby="gameoverTitle" aria-modal="true">
+        <h2 id="gameoverTitle">Game Over</h2>
+        <p id="gameoverStats"></p>
+        <div class="actions">
+            <button id="retryBtn" class="btn-retry">Retry</button>
+            <button id="menuBtn" class="btn-menu">Menu</button>
+        </div>
+    </div>
+</div>
+
+<button id="exitFullscreenBtn" class="exit-fullscreen" type="button">Exit Fullscreen</button>
+<button id="musicToggleBtn" class="music-btn" type="button">Music: Off</button>
+
+<script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const menuOverlay = document.getElementById("menuOverlay");
+    const startBtn = document.getElementById("startBtn");
+    const fullscreenBtn = document.getElementById("fullscreenBtn");
+    const exitFullscreenBtn = document.getElementById("exitFullscreenBtn");
+    const overlay = document.getElementById("gameoverOverlay");
+    const gameoverStats = document.getElementById("gameoverStats");
+    const retryBtn = document.getElementById("retryBtn");
+    const menuBtn = document.getElementById("menuBtn");
+    const bgm = document.getElementById("bgm");
+    const deathSfx = document.getElementById("deathSfx");
+    const pointSfx = document.getElementById("pointSfx");
+    const musicToggleBtn = document.getElementById("musicToggleBtn");
+
+    let state = "menu";
+    let frame = 0;
+    let score = 0;
+    let highScore = parseInt(localStorage.getItem("flappyHighScore")) || 0;
+    let storedMusicPref = localStorage.getItem("flappyMusicEnabled");
+    let musicEnabled = storedMusicPref === null ? true : storedMusicPref === "true";
+
+    let bird = { x: 90, y: 320, r: 14, v: 0, flap: 0 };
+    let gravity = 0.45;
+    let jump = -8.5;
+
+    let pipes = [];
+    let groundX = 0;
+
+    let clouds = [];
+    for (let i = 0; i < 4; i++) {
+        clouds.push({
+            x: i * 200,
+            y: 90 + Math.random() * 120,
+            speed: 0.3 + Math.random() * 0.3
+        });
+    }
+
+    function showMenuOverlay() {
+        menuOverlay.style.display = "flex";
+        menuOverlay.setAttribute("aria-hidden", "false");
+        tryPlayBgm();
+    }
+
+    function hideMenuOverlay() {
+        menuOverlay.style.display = "none";
+        menuOverlay.setAttribute("aria-hidden", "true");
+    }
+
+    function reset() {
+        bird.y = 320;
+        bird.v = 0;
+        pipes = [];
+        score = 0;
+        frame = 0;
+        state = "playing";
+        hideGameOverDialog();
+    }
+
+    function resetToMenu() {
+        bird.y = 320;
+        bird.v = 0;
+        pipes = [];
+        score = 0;
+        frame = 0;
+        state = "menu";
+        hideGameOverDialog();
+        showMenuOverlay();
+        tryPlayBgm();
+    }
+
+    function startGame() {
+        hideMenuOverlay();
+        reset();
+        tryPlayBgm();
+    }
+
+    function spawnPipe() {
+        let gap = 160;
+        let top = Math.random() * 240 + 60;
+        pipes.push({ x: canvas.width, top: top, bottom: canvas.height - top - gap, passed: false });
+    }
+
+    function input() {
+        if (state !== "playing") return;
+        bird.v = jump;
+        tryPlayBgm();
+    }
+
+    document.addEventListener("keydown", e => {
+        if (e.code === "Space") input();
+    });
+
+    document.addEventListener("mousedown", input);
+    document.addEventListener("touchstart", input);
+
+    startBtn.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        startGame();
+    });
+
+    fullscreenBtn.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen();
+        }
+    });
+
+    exitFullscreenBtn.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        }
+    });
+
+    function syncFullscreenUI() {
+        exitFullscreenBtn.style.display = document.fullscreenElement ? "block" : "none";
+    }
+
+    document.addEventListener("fullscreenchange", syncFullscreenUI);
+    syncFullscreenUI();
+    document.addEventListener("pointerdown", () => tryPlayBgm(), { once: true });
+
+    function updateMusicButton() {
+        musicToggleBtn.textContent = musicEnabled ? "Music: On" : "Music: Off";
+    }
+
+    function tryPlayBgm() {
+        if (!musicEnabled) return;
+        if (!bgm) return;
+        if (!bgm.paused) return;
+        bgm.volume = 0.4;
+        bgm.play().catch(() => { });
+    }
+
+    function stopBgm() {
+        if (!bgm) return;
+        bgm.pause();
+        bgm.currentTime = 0;
+    }
+
+    function playDeathOnce() {
+        if (!deathSfx) return;
+        deathSfx.currentTime = 0;
+        deathSfx.volume = 0.35;
+        deathSfx.play().catch(() => { });
+    }
+
+    function playPointSfx() {
+        if (!pointSfx) return;
+        const sfx = pointSfx.cloneNode(true);
+        sfx.volume = 0.35;
+        sfx.play().catch(() => { });
+    }
+
+    musicToggleBtn.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        musicEnabled = !musicEnabled;
+        localStorage.setItem("flappyMusicEnabled", musicEnabled);
+        updateMusicButton();
+        if (musicEnabled) {
+            tryPlayBgm();
+        } else {
+            stopBgm();
+        }
+    });
+
+    updateMusicButton();
+
+    function update() {
+        if (state !== "playing") return;
+
+        bird.v += gravity;
+        bird.y += bird.v;
+        bird.flap = Math.sin(frame * 0.3) * 6;
+
+        if (frame % 95 === 0) spawnPipe();
+
+        pipes.forEach(p => {
+            p.x -= 2.6;
+
+            if (!p.passed && p.x + 60 < bird.x) {
+                p.passed = true;
+                score++;
+                playPointSfx();
+            }
+
+            if (
+                bird.x + bird.r > p.x &&
+                bird.x - bird.r < p.x + 60 &&
+                (bird.y - bird.r < p.top || bird.y + bird.r > canvas.height - p.bottom)
+            ) {
+                endGame();
+            }
+        });
+
+        if (bird.y + bird.r > canvas.height - 60 || bird.y - bird.r < 0) {
+            endGame();
+        }
+
+        pipes = pipes.filter(p => p.x > -80);
+
+        groundX = (groundX - 2.6) % 30;
+        frame++;
+    }
+
+    function endGame() {
+        state = "gameover";
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem("flappyHighScore", highScore);
+        }
+        stopBgm();
+        playDeathOnce();
+        showGameOverDialog();
+    }
+
+    function showGameOverDialog() {
+        gameoverStats.textContent = `Score: ${score}  •  Best: ${highScore}`;
+        overlay.style.display = "flex";
+        overlay.setAttribute("aria-hidden", "false");
+    }
+
+    function hideGameOverDialog() {
+        overlay.style.display = "none";
+        overlay.setAttribute("aria-hidden", "true");
+    }
+
+    retryBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        startGame();
+    });
+
+    menuBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        resetToMenu();
+    });
+
+    function drawBackground() {
+        ctx.fillStyle = "#4fc3f7";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = "rgba(255,255,255,0.75)";
+        clouds.forEach(c => {
+            c.x -= c.speed;
+            if (c.x < -120) {
+                c.x = canvas.width + 120;
+                c.y = 80 + Math.random() * 120;
+            }
+
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, 26, 0, Math.PI * 2);
+            ctx.arc(c.x + 28, c.y - 10, 32, 0, Math.PI * 2);
+            ctx.arc(c.x + 60, c.y, 26, 0, Math.PI * 2);
+            ctx.arc(c.x + 30, c.y + 10, 22, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    function drawPipes() {
+        pipes.forEach(p => {
+            let body = ctx.createLinearGradient(p.x, 0, p.x + 60, 0);
+            body.addColorStop(0, "#1b5e20");
+            body.addColorStop(0.5, "#66bb6a");
+            body.addColorStop(1, "#1b5e20");
+
+            let highlight = ctx.createLinearGradient(p.x, 0, p.x + 60, 0);
+            highlight.addColorStop(0, "rgba(255,255,255,0.25)");
+            highlight.addColorStop(0.3, "rgba(255,255,255,0)");
+            highlight.addColorStop(1, "rgba(0,0,0,0.2)");
+
+            ctx.fillStyle = body;
+            ctx.beginPath();
+            ctx.roundRect(p.x, 0, 60, p.top, 8);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.roundRect(p.x, canvas.height - p.bottom, 60, p.bottom, 8);
+            ctx.fill();
+
+            ctx.fillStyle = highlight;
+            ctx.fillRect(p.x + 6, 0, 10, p.top);
+            ctx.fillRect(p.x + 6, canvas.height - p.bottom, 10, p.bottom);
+
+            // subtle seam
+            ctx.strokeStyle = "rgba(0,0,0,0.12)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(p.x + 2, 2, 56, p.top - 4, 7);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.roundRect(p.x + 2, canvas.height - p.bottom + 2, 56, p.bottom - 4, 7);
+            ctx.stroke();
+
+            ctx.fillStyle = "#2e7d32";
+            ctx.roundRect(p.x - 4, p.top - 18, 68, 18, 6);
+            ctx.fill();
+
+            ctx.roundRect(p.x - 4, canvas.height - p.bottom, 68, 18, 6);
+            ctx.fill();
+
+            // cap shine
+            ctx.fillStyle = "rgba(255,255,255,0.2)";
+            ctx.fillRect(p.x + 6, p.top - 16, 12, 12);
+            ctx.fillRect(p.x + 6, canvas.height - p.bottom + 2, 12, 12);
+        });
+    }
+
+    function drawBird() {
+        ctx.save();
+        ctx.translate(bird.x, bird.y);
+        ctx.rotate(bird.v * 0.05);
+
+        // body with subtle gradient
+        let bodyGrad = ctx.createRadialGradient(-4, -6, 4, 2, 2, 20);
+        bodyGrad.addColorStop(0, "#fff59d");
+        bodyGrad.addColorStop(0.6, "#ffeb3b");
+        bodyGrad.addColorStop(1, "#f9a825");
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, bird.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // wing
+        ctx.fillStyle = "#fbc02d";
+        ctx.beginPath();
+        ctx.arc(-4, bird.flap, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // eye
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(5, -4, 4.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#222";
+        ctx.beginPath();
+        ctx.arc(6.3, -4.5, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // beak
+        ctx.fillStyle = "#ff9800";
+        ctx.beginPath();
+        ctx.moveTo(12, -1);
+        ctx.lineTo(22, 2);
+        ctx.lineTo(12, 6);
+        ctx.closePath();
+        ctx.fill();
+
+        // outline
+        ctx.strokeStyle = "rgba(0,0,0,0.12)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(0, 0, bird.r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function drawGround() {
+        const y = canvas.height - 60;
+
+        let soil = ctx.createLinearGradient(0, y, 0, canvas.height);
+        soil.addColorStop(0, "#6d4c41");
+        soil.addColorStop(1, "#3e2723");
+        ctx.fillStyle = soil;
+        ctx.fillRect(0, y, canvas.width, 60);
+
+        // grass with highlight strip
+        let grass = ctx.createLinearGradient(0, y, 0, y + 12);
+        grass.addColorStop(0, "#9ccc65");
+        grass.addColorStop(1, "#5fa832");
+        ctx.fillStyle = grass;
+        ctx.fillRect(0, y, canvas.width, 10);
+        ctx.fillStyle = "rgba(255,255,255,0.35)";
+        ctx.fillRect(0, y + 2, canvas.width, 2);
+
+        ctx.fillStyle = "#8d6e63";
+        for (let i = 0; i < canvas.width / 30 + 2; i++) {
+            ctx.fillRect(i * 30 + groundX, y + 18, 12, 6);
+            ctx.fillRect(i * 30 + groundX + 14, y + 38, 10, 5);
+        }
+
+        // grass blades
+        ctx.strokeStyle = "rgba(34, 102, 34, 0.45)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i < canvas.width; i += 18) {
+            let gx = (i + groundX * 2) % (canvas.width + 20) - 10;
+            ctx.beginPath();
+            ctx.moveTo(gx, y + 10);
+            ctx.lineTo(gx + 3, y + 2);
+            ctx.stroke();
+        }
+    }
+
+    function drawUI() {
+        ctx.textAlign = "center";
+
+        function drawPill(x, y, w, h, color, stroke) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, h / 2);
+            ctx.fill();
+            if (stroke) {
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        function drawBadge(text, x, y) {
+            ctx.font = "700 14px Arial";
+            const padX = 12;
+            const h = 26;
+            const metrics = ctx.measureText(text);
+            const w = metrics.width + padX * 2;
+            drawPill(x - w / 2, y - h / 2, w, h, "rgba(0,0,0,0.35)", "rgba(255,255,255,0.25)");
+            ctx.fillStyle = "white";
+            ctx.fillText(text, x, y + 5);
+        }
+
+        function drawBadgeRight(text, rightX, y) {
+            ctx.save();
+            ctx.font = "700 14px Arial";
+            ctx.textAlign = "right";
+            const padX = 12;
+            const h = 26;
+            const metrics = ctx.measureText(text);
+            const w = metrics.width + padX * 2;
+            drawPill(rightX - w, y - h / 2, w, h, "rgba(0,0,0,0.35)", "rgba(255,255,255,0.25)");
+            ctx.fillStyle = "white";
+            ctx.fillText(text, rightX - padX, y + 5);
+            ctx.restore();
+        }
+
+        if (state === "menu") {
+            ctx.font = "bold 32px Arial";
+            ctx.fillStyle = "white";
+            ctx.fillText("DRUNKY BIRD", canvas.width / 2, 260);
+            ctx.font = "18px Arial";
+            ctx.fillStyle = "rgba(255,255,255,0.9)";
+            ctx.fillText("Press SPACE or TAP to start", canvas.width / 2, 300);
+            drawBadgeRight("Best: " + highScore, canvas.width - 16, 40);
+        }
+
+        if (state === "playing") {
+            ctx.font = "800 44px Arial";
+            ctx.fillStyle = "rgba(0,0,0,0.35)";
+            ctx.fillText(score, canvas.width / 2 + 2, 70 + 2);
+            ctx.fillStyle = "white";
+            ctx.fillText(score, canvas.width / 2, 70);
+            drawBadgeRight("Best " + highScore, canvas.width - 16, 40);
+        }
+
+        if (state === "gameover") {
+            ctx.font = "bold 32px Arial";
+            ctx.fillStyle = "white";
+            ctx.fillText("GAME OVER", canvas.width / 2, 260);
+            ctx.font = "22px Arial";
+            ctx.fillText("Score: " + score, canvas.width / 2, 340);
+            drawBadgeRight("Best: " + highScore, canvas.width - 16, 40);
+        }
+    }
+
+    function draw() {
+        drawBackground();
+        drawPipes();
+        drawBird();
+        drawGround();
+        drawUI();
+    }
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    loop();
+</script>
+
+</body>
+</html>
