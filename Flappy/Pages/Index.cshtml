@@ -286,7 +286,11 @@
     let groundHeight = 60;
 
     let state = "menu";
-    let frame = 0;
+    const targetFrameMs = 1000 / 60;
+    const pipeSpawnIntervalMs = targetFrameMs * 95;
+    let flapPhase = 0;
+    let pipeSpawnTimer = 0;
+    let lastTime = 0;
     let score = 0;
     let highScore = parseInt(localStorage.getItem("flappyHighScore")) || 0;
     let storedMusicPref = localStorage.getItem("flappyMusicEnabled");
@@ -357,7 +361,8 @@
         bird.v = 0;
         pipes = [];
         score = 0;
-        frame = 0;
+        flapPhase = 0;
+        pipeSpawnTimer = 0;
         state = "playing";
         hideGameOverDialog();
     }
@@ -368,7 +373,8 @@
         bird.v = 0;
         pipes = [];
         score = 0;
-        frame = 0;
+        flapPhase = 0;
+        pipeSpawnTimer = 0;
         state = "menu";
         hideGameOverDialog();
         showMenuOverlay();
@@ -482,17 +488,25 @@
 
     updateMusicButton();
 
-    function update() {
+    function update(deltaMs) {
         if (state !== "playing") return;
 
-        bird.v += gravity;
-        bird.y += bird.v;
-        bird.flap = Math.sin(frame * 0.3) * 6;
+        const clampedMs = Math.min(deltaMs, 50);
+        const dtRatio = clampedMs / targetFrameMs;
 
-        if (frame % 95 === 0) spawnPipe();
+        bird.v += gravity * dtRatio;
+        bird.y += bird.v * dtRatio;
+        flapPhase += dtRatio;
+        bird.flap = Math.sin(flapPhase * 0.3) * 6;
+
+        pipeSpawnTimer += clampedMs;
+        while (pipeSpawnTimer >= pipeSpawnIntervalMs) {
+            spawnPipe();
+            pipeSpawnTimer -= pipeSpawnIntervalMs;
+        }
 
         pipes.forEach(p => {
-            p.x -= pipeSpeed;
+            p.x -= pipeSpeed * dtRatio;
 
             if (!p.passed && p.x + pipeWidth < bird.x) {
                 p.passed = true;
@@ -515,8 +529,15 @@
 
         pipes = pipes.filter(p => p.x > -pipeWidth - 20);
 
-        groundX = (groundX - pipeSpeed) % 30;
-        frame++;
+        groundX = (groundX - pipeSpeed * dtRatio) % 30;
+
+        clouds.forEach(c => {
+            c.x -= c.speed * dtRatio;
+            if (c.x < -120) {
+                c.x = worldWidth + 120;
+                c.y = 80 + Math.random() * 120;
+            }
+        });
     }
 
     function endGame() {
@@ -557,12 +578,6 @@
 
         ctx.fillStyle = "rgba(255,255,255,0.75)";
         clouds.forEach(c => {
-            c.x -= c.speed;
-            if (c.x < -120) {
-                c.x = worldWidth + 120;
-                c.y = 80 + Math.random() * 120;
-            }
-
             ctx.beginPath();
             ctx.arc(c.x, c.y, 26, 0, Math.PI * 2);
             ctx.arc(c.x + 28, c.y - 10, 32, 0, Math.PI * 2);
@@ -790,13 +805,16 @@
         ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
 
-    function loop() {
-        update();
+    function loop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        const deltaMs = timestamp - lastTime;
+        lastTime = timestamp;
+        update(deltaMs);
         draw();
         requestAnimationFrame(loop);
     }
 
-    loop();
+    requestAnimationFrame(loop);
 </script>
 
 </body>
