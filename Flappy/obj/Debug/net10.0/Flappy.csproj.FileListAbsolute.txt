@@ -95,3 +95,4 @@
 /Users/davidpedragosa/Work/Flappy/Flappy/obj/Debug/net10.0/Flappy.pdb
 /Users/davidpedragosa/Work/Flappy/Flappy/obj/Debug/net10.0/Flappy.genruntimeconfig.cache
 /Users/davidpedragosa/Work/Flappy/Flappy/obj/Debug/net10.0/ref/Flappy.dll
+/Users/davidpedragosa/Work/Flappy/Flappy/obj/Debug/net10.0/Flappy.sourcelink.json
